@@ -1,0 +1,157 @@
+:root {
+    --org-bl: #26A6B5;
+    width: 100%;
+    height: 100%;
+}
+
+.hdr {
+    background-color: var(--org-bl);
+    color:#fff;
+    height: 6.5rem;
+}
+
+.app-body {
+    flex: 1;
+    width: 100%;
+}
+.app-cont {
+    
+    height: 100vh;
+}
+
+.app-arranger {
+    width: 100%;
+    height:100%;
+    display: flex;
+    flex-direction: column;
+}
+
+body {
+font-family: Open Sans, sans-serif;
+margin:0;
+}
+
+.input {
+border-width: 0px 0px 1px 0px;
+border-color: #8F9FB5;
+border-radius: 0px;
+background-color: #0e1012;
+color: #A0AABA;
+
+background-color: #fff;
+border-radius: 4px;
+border: 1px solid #ccc;
+color: #333;
+display: table;
+border-spacing: 0;
+border-collapse: separate;
+height: 36px;
+overflow: hidden;
+padding-left: 1em;
+padding-right: 1em;
+}
+
+.upload {
+
+    border-width: 1px;
+    border-style: dashed;
+    border-radius: .5rem;
+    text-align: center;
+    font-size: 2rem;
+    padding:0.5em;
+    margin-left: 1em;
+    margin-right: 1em;
+    color: #fff;
+    background-color: #B5387C;
+    border-color: #B5387C;
+
+}
+ 
+.str{
+    align-self: stretch;
+}
+
+.input-div {
+    margin-bottom: 0.5em;
+}
+
+.status {
+
+    border-width: 1px;
+    border-style: dashed;
+    border-radius: .5rem;
+    text-align: center;
+    font-size: 2rem;
+    padding:0.5em;
+    margin-left: 1em;
+    margin-right: 1em;
+    color: #413f40;
+    border-color: #413f40;
+}
+
+.upload:hover {
+    background-color: #9C306B;
+    border-color: #9C306B;
+    color: #fff;
+}
+
+.upload:focus {
+    box-shadow: #752451;
+}
+
+.upload:active {
+    background-color: #752451;
+    border-color: #752451;
+    color: #fff;
+}
+
+.header-h1 {
+    margin-left: 1em;
+    margin-right: 1em;
+}
+
+.flx {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.hfill {
+    width: 100%;
+}
+
+.vfill {
+    height:100%;
+}
+
+.rw {
+    flex-direction: row;
+}
+.cl {
+    flex-direction: column;
+}
+
+.drop {
+    min-width: 20vw;
+}
+
+.sp-ev { 
+    justify-content: space-evenly;
+}
+
+.left-align {
+    align-items: flex-start;
+}
+
+.sp-bt {
+    justify-content: space-between;
+}
+
+.nowrap {
+    flex-wrap: nowrap;
+}
+
+.slider {
+    min-width: 80%;
+}
+
