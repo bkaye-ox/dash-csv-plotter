@@ -35,31 +35,33 @@ header = html.Div([
     html.H1('Analysis Suite', className='header-h1'),
     upload_bar,
     dbc.Button(html.Div([html.I(className="bi bi-list me-2"),
-               ' Controls']), color="secondary", id='sidebar-open'),
+               ' Controls'], className='header-button'), color="secondary", id='sidebar-open'),
 ], className='flx rw hfill sp-ev hdr')
 
 
 figure_source = html.Div([
     html.Div([
-        html.Div('x-axis source'),
-        dcc.Dropdown(id='header_drop_x', placeholder='x',
-                     options=[], className='drop')
-    ], className='input-div'),
-    html.Div([
+        html.Div([
+            html.Div('x-axis source'),
+            dcc.Dropdown(id='header_drop_x', placeholder='x',
+                         options=[], className='drop')
+        ], className='input-div'),
         html.Div([
             html.Div('y-axis source'),
             dcc.Dropdown(id='header_drop_y', placeholder='y(s)',
                          options=[], multi=True, className='drop'),
 
         ], className='input-div'),
+        html.Div([
+            html.Div('secondary-y-axis source'), dcc.Dropdown(id='header_drop_alty', placeholder='alt y(s)',
+                                                              options=[], multi=True, className='drop')
+        ], className='input-div'),
+    ], style={'width': '80%'}, className='left-align flx cl'),
+    html.Div(
         daq.BooleanSwitch(id='spectrum_button', disabled=True,
                           label='Spectrum'),
-    ], className='flx rw sp-ev'),
-    html.Div([
-        html.Div('secondary-y-axis source'), dcc.Dropdown(id='header_drop_alty', placeholder='alt y(s)',
-                                                          options=[], multi=True, className='drop')
-    ], className='input-div'),
-], className='flx cl left-align sp-ev hfill')
+    ),
+], className='flx rw left-align sp-ev hfill')
 
 figure_layout = html.Div([
     html.Div([
@@ -92,7 +94,7 @@ figure_time = html.Div([
         daq.BooleanSwitch(id='time_switch', on=False, disabled=True,
                              label='Enable'),
 
-    ], className='flx rw sp-ev'),
+    ], className='flx rw sp-ev hfill'),
     dcc.RangeSlider(0, 0, value=[0, 0], id='slider', className='slider'),
 ], className='flx cl hfill left-align str sp-ev')
 
@@ -108,7 +110,7 @@ sidebar = dbc.Offcanvas(
         dbc.ListGroupItem(figure_layout, className='sidebar-cont'),
     ]),
     id="sidebar",
-    title="Title",
+    title="Graph controls",
     is_open=False,)
 
 # graph_controls = html.Div([
@@ -126,7 +128,7 @@ app.layout = html.Div([
         html.Div([
             # graph_controls,
             dcc.Graph(id='graph', style={
-                      'height': '70vh'}, className='hfill graph-container'),
+                      'height': '88vh'}, className='hfill graph-container'),
         ], className='app-body flx cl str sp-ev'),
     ], className='app-arranger')
 ], className='app-cont')

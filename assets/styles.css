@@ -49,6 +49,7 @@ height: 36px;
 overflow: hidden;
 padding-left: 1em;
 padding-right: 1em;
+width: 100%;
 }
 
 .upload {
@@ -57,7 +58,8 @@ padding-right: 1em;
     border-style: dashed;
     border-radius: .5rem;
     text-align: center;
-    font-size: 2rem;
+
+    font-size: 1.5vw;
     padding:0.5em;
     margin-left: 1em;
     margin-right: 1em;
@@ -74,7 +76,7 @@ padding-right: 1em;
 .input-div {
     margin-right: 0.5em;
     margin-bottom: 0.5em;
-    max-width: 30em;
+    width: 100%;
 }
 
 .sidebar-cont {
@@ -96,7 +98,8 @@ padding-right: 1em;
     border-style: dashed;
     border-radius: .5rem;
     text-align: center;
-    font-size: 2rem;
+
+    font-size: 1.5vw;
     padding:0.5em;
     margin-left: 1em;
     margin-right: 1em;
@@ -104,6 +107,9 @@ padding-right: 1em;
     border-color: #413f40;
 }
 
+.header-button {
+    font-size: 1.5vw;
+}
 .upload:hover {
     background-color: #9C306B;
     border-color: #9C306B;
@@ -123,6 +129,7 @@ padding-right: 1em;
 .header-h1 {
     margin-left: 1em;
     margin-right: 1em;
+    font-size: 3vw;
 }
 
 .flx {
@@ -147,7 +154,7 @@ padding-right: 1em;
 }
 
 .drop {
-    min-width: 20vw;
+    min-width: 100%;
 }
 
 .sp-ev { 
