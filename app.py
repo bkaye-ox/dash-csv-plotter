@@ -22,7 +22,7 @@ app = DashProxy(__name__,
                 transforms=[MultiplexerTransform()],
                 external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
 
-store = html.Div([dcc.Store(id='file_memory', data=[None, None]),
+store = html.Div([dcc.Store(id='file_memory', data={}),
                   dcc.Store(id='series_cache', data={}),
                   dcc.Store(id='index_range', data=[0, None]),
                   dcc.Store(id='update_graph', data=0), ])
@@ -36,9 +36,11 @@ header = html.Div([
     html.Div('Analysis Suite', className='header-h1'),
     dcc.Upload('Upload or drag files here',
                id='upload-data', className='upload'),
-    html.Div('Current file: .', id='status_text', className='status'),
+    html.Div(
+    dcc.Dropdown(id='file_selector', className='drop', multi=True, options=[]), style={'width':'20em'}),
     dbc.Button(html.Div([html.I(className="bi bi-list me-2"),
                ' Controls'], className='header-button'), color="secondary", id='sidebar-open'),
+    html.Div(id='status_text')
 ], className='hdr flx rw hfill sp-ev wrap')
 
 
@@ -145,9 +147,9 @@ app.layout = html.Div([
 ], className='app-cont')
 
 
-@app.callback([Output('series_cache', 'data'), Output('file_memory', 'data'), Output('sidebar', 'is_open')], Input('upload-data', 'contents'),
-              State('upload-data', 'filename'))
-def file_ready(list_of_contents, list_of_names):
+@app.callback(Output('series_cache', 'data'), Output('file_memory', 'data'), Output('sidebar', 'is_open'), Output('file_selector', 'options'), Output('file_selector', 'value'), Input('upload-data', 'contents'),
+              State('upload-data', 'filename'), State('file_memory', 'data'), State('series_cache', 'data'), State('file_selector', 'value'))
+def file_ready(list_of_contents, list_of_names, file_mem, cache, fn_select):
     if list_of_contents is None:
         raise PreventUpdate
 
@@ -155,23 +157,24 @@ def file_ready(list_of_contents, list_of_names):
     contents = list_of_contents
 
     content_type, content_b64 = contents.split(',')
-
     content_str = base64.b64decode(content_b64).decode()
-    # end_idx = content_str.find('\r\n')
 
-    # headers = content_str[:end_idx].split(',')
     rows = parse_csv(content_str)
     csv = (rows[0], rows[2:-1])
 
-    # csv = (headers, content_str[end_idx+1:])
+    new_file_mem = file_mem | {fn: csv}
 
     time = get_time(csv)
-    cache = {}
+    new_cache = {fn: {}}
     if time is not None:
         csv[0].append('TimeS')
-        cache = {'TimeS': time}
+        new_cache = {fn: {'TimeS': time}}
 
-    return cache, csv, True
+    if fn_select is not None:
+        fn_select.append(fn)
+    else:
+        fn_select = [fn]
+    return cache | new_cache, new_file_mem, True, list(new_file_mem.keys()), fn_select
 
 
 def parse_csv(string, lb='\r\n', quote='"', delim=','):
@@ -194,6 +197,7 @@ def parse_csv(string, lb='\r\n', quote='"', delim=','):
     # return rows
     return [row for row in csv.reader(io.StringIO(string))]
 
+
 @app.callback(Output('sidebar', 'is_open'), Input('sidebar-open', 'n_clicks'), State('sidebar', 'is_open'))
 def open_sb(n_clicks, open):
     return not open
@@ -201,8 +205,12 @@ def open_sb(n_clicks, open):
 
 @app.callback(Output('graph', 'figure'), Output('series_cache', 'data'),
               Input('update_graph', 'data'),
-              State('series_cache', 'data'), State('file_memory', 'data'), State('header_drop_x', 'value'), State('header_drop_y', 'value'), State('header_drop_alty', 'value'), State('index_range', 'data'), State('spectrum_button', 'on'), State('filter_button', 'on'), State('filt_win', 'value'), State('x_label', 'value'), State('y_label', 'value'), State('title_in', 'value'))
-def graph_update(_, cache, csv, hx, hy, hay, range, spectrum, filter_on, filt_window, xlabel, ylabel, title):
+              State('file_selector', 'value'), State('series_cache', 'data'), State('file_memory', 'data'), State('header_drop_x', 'value'), State('header_drop_y', 'value'), State('header_drop_alty', 'value'), State('index_range', 'data'), State('spectrum_button', 'on'), State('filter_button', 'on'), State('filt_win', 'value'), State('x_label', 'value'), State('y_label', 'value'), State('title_in', 'value'))
+def graph_update(_, fns, cache, csv, hx, hy, hay, range, spectrum, filter_on, filt_window, xlabel, ylabel, title):
+
+    if fns is None or len(fns) == 0:
+        raise PreventUpdate
+
     if not hx or (not hy and not hay):
         raise PreventUpdate
 
@@ -214,16 +222,16 @@ def graph_update(_, cache, csv, hx, hy, hay, range, spectrum, filter_on, filt_wi
     cols = (hx,) + hy + \
         hay if hay is not None else (hx,) + hy
 
-    new_cache = cache | cache_data(cols, cache, csv)
+    new_cache = cache_data(cols, cache, csv, fns)
 
     if spectrum:
         hy_singleton = hy if isinstance(hy, str) else hy[0] if isinstance(
             hy, list) or isinstance(hy, tuple) else None
-        fig = make_spectrum(hx, hy_singleton, new_cache, range)
+        fig = make_spectrum(hx, hy_singleton, new_cache, range, fns)
     else:
         filt = (filter_on, filt_window)
 
-        fig = make_fig(hx, hy, hay, new_cache, range, filt)
+        fig = make_fig(hx, hy, hay, new_cache, range, filt, fns)
 
     fig['layout']['xaxis']['title'] = xlabel
     fig['layout']['yaxis']['title'] = ylabel
@@ -235,10 +243,13 @@ def graph_update(_, cache, csv, hx, hy, hay, range, spectrum, filter_on, filt_wi
 
 @ app.callback([Output('header_drop_x', 'options'), Output('header_drop_y', 'options'), Output('header_drop_alty', 'options'), Output('drop_time', 'options'), Output('status_text', 'children')],
                Input('file_memory', 'data'),
-               State('upload-data', 'filename'))
-def update_output(csv, fn):
-    disp_headers = [h for h in csv[0] if h != "''"]
-    return *(disp_headers for k in range(4)), f'file uploaded: {fn}'
+               State('file_selector', 'value'))
+def update_output(csv, fns):
+
+
+    disp_headers = list(set.intersection(*(set(h for h in csv[fn][0]) for fn in fns)))
+    # disp_headers = list(headers[0].intersect(*headers))
+    return *(disp_headers for k in range(4)), f'file uploaded'
 
 
 @ app.callback(Output('header_drop_x', 'value'), Output('header_drop_y', 'value'), Output('drop_time', 'value'), Input('header_drop_x', 'options'))
@@ -268,7 +279,7 @@ def get_time(csv):
 
 @ app.callback(Output('update_graph', 'data'),  # Output('title_in', 'value'), Output('x_label', 'value'), Output('y_label', 'value'),
                Input('filter_button', 'on'), Input('filt_win', 'value'), Input('header_drop_x', 'value'), Input('header_drop_y', 'value'), Input(
-                   'header_drop_alty', 'value'), Input('spectrum_button', 'on'), Input('index_range', 'data'), Input('x_label', 'value'), Input('y_label', 'value'), Input('title_in', 'value'),
+                   'header_drop_alty', 'value'), Input('spectrum_button', 'on'), Input('index_range', 'data'), Input('x_label', 'value'), Input('y_label', 'value'), Input('title_in', 'value'), Input('file_selector','value'),
                State('update_graph', 'data'))
 def update_fig_cb(*args):
     # header_x, header_y, header_alty,spectrum, range, update_count
@@ -277,7 +288,28 @@ def update_fig_cb(*args):
     #new_cache, f'{header_x} vs. {",".join(header_y)}', f'{header_x}', f'{",".join(header_y)}'
 
 
-def make_fig(h_x, h_ys, h_ays, cache, id_range, filt):
+def make_fig(h_x, h_ys, h_ays, super_cache, id_range, filt, fns):
+    trs = []
+    scnds = []
+    for fn in fns:
+        cache = super_cache.get(fn)
+
+        trs_fn, seconds_fn = make_fig_traces(
+            h_x, h_ys, h_ays, cache, id_range, filt)
+
+        trs.extend(trs_fn)
+        if seconds_fn is not None:
+            scnds.extend(seconds_fn)
+
+    if h_ays is not None:
+        fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
+        fig.add_traces(trs, scnds)
+    else:
+        fig = psp.make_subplots()
+        fig.add_traces(trs)
+    return fig
+
+def make_fig_traces(h_x, h_ys, h_ays, cache, id_range, filt):
     h_ys = (h_ys,) if isinstance(h_ys, str) else tuple(
         h_ys) if isinstance(h_ys, list) else h_ys
     h_ays = (h_ays,) if isinstance(h_ays, str) else tuple(
@@ -301,19 +333,16 @@ def make_fig(h_x, h_ys, h_ays, cache, id_range, filt):
             alt_y_c = [filter(y, filt[1]) for y in alt_y_c]
         alt_ys = [y[id_range[0]:id_range[1]] for y in alt_y_c]
 
+    second = None
     if h_ays is not None:
-        fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
         traces = [go.Scatter(x=x, y=yk, name=hyk)
                   for yk, hyk in zip(ys+alt_ys, h_ys+h_ays)]
         second = tuple(False for k in range(len(ys))) + \
             tuple(True for k in range(len(alt_ys)))
-        fig.add_traces(traces, secondary_ys=second)
     else:
-        fig = psp.make_subplots()
         traces = [go.Scatter(x=x, y=yk, name=hyk) for yk, hyk in zip(ys, h_ys)]
-        fig.add_traces(traces)
 
-    return fig
+    return traces, second
 
 
 def filter(series, window):
@@ -359,18 +388,28 @@ def update_sb(hx, hy, hay):
         return True, False
 
 
-def make_spectrum(hx, hy, ch, rng):
+def make_spectrum(hx, hy, ch, rng, fns):
+    trs = []
+    for fn in fns:
+        cache = ch.get(fn)
+        trs.append(make_spectrum_tr(hx, hy, cache, rng))
+    fig = psp.make_subplots()
+    fig.add_traces(trs)
+
+
+def make_spectrum_tr(hx, hy, ch, rng):
     t = ch.get(hx)[rng[0]:rng[1]]
     fs = 1/np.mean(np.diff(t))
 
     y = ch.get(hy)[rng[0]:rng[1]]
     f, Pxx = sps.periodogram(y, fs)
 
-    fig = psp.make_subplots()
+    # fig = psp.make_subplots()
     tr = go.Scatter(x=f, y=Pxx, mode='lines')
-    fig.add_trace(tr)
+    # fig.add_trace(tr)
 
-    return fig
+    return tr
+
 
 
 @ app.callback(Output('slider', 'min'), Output('slider', 'max'), Output('slider', 'value'), Input('drop_time', 'value'), State('series_cache', 'data'))
@@ -395,9 +434,14 @@ def droptimecb(inval, cache):
     return min_t, max_t, [min_t, max_t]
 
 
-def cache_data(cols, cache, csv):
-    not_cached = [k for k in cols if not cache.get(k)]
-    return {col: series for col, series in zip(not_cached, process_cols(not_cached, csv))}
+def cache_data(cols, cache, csv, fns):
+
+    for fn in fns:
+        fn_csv = csv.get(fn)
+        not_cached = [k for k in cols if not cache.get(k)]
+        cache[fn] = cache[fn] | {col: series for col, series in zip(
+            not_cached, process_cols(not_cached, fn_csv))}
+    return cache
 
 
 def process_cols(cols, csv):
