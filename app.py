@@ -130,12 +130,12 @@ app.layout = html.Div([
                     
             className='graph-sizer')  # graph_controls,
 
-        ], className='app-body flx cl str sp-ev'),
+        ], className='flx cl str app-body'),
     ], className='app-arranger')
 ], className='app-cont')
 
 
-@app.callback([Output('series_cache', 'data'), Output('file_memory', 'data')], Input('upload-data', 'contents'),
+@app.callback([Output('series_cache', 'data'), Output('file_memory', 'data'), Output('sidebar','is_open')], Input('upload-data', 'contents'),
               State('upload-data', 'filename'))
 def file_ready(list_of_contents, list_of_names):
     if list_of_contents is None:
@@ -161,7 +161,7 @@ def file_ready(list_of_contents, list_of_names):
         csv[0].append('TimeS')
         cache = {'TimeS': time}
 
-    return cache, csv
+    return cache, csv, True
 
 
 def parse_csv(string, lb='\r\n', quote='"', delim=','):
