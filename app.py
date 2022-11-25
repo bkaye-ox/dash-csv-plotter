@@ -126,9 +126,10 @@ app.layout = html.Div([
     html.Div([
         header,
         html.Div([
-            # graph_controls,
-            dcc.Graph(id='graph', style={
-                      'height': '88vh'}, className='hfill graph-container'),
+            html.Div(dcc.Graph(id='graph', className='hfill graph-container'),
+                    
+            className='graph-sizer')  # graph_controls,
+
         ], className='app-body flx cl str sp-ev'),
     ], className='app-arranger')
 ], className='app-cont')
