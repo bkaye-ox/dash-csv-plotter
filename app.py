@@ -36,19 +36,21 @@ figure_source = html.Div([
         html.Div('x-axis source'),
         dcc.Dropdown(id='header_drop_x', placeholder='x',
                      options=[], className='drop')
-    ], className='input-div'),
+    ], className='input-div mlr'),
     html.Div([
-        html.Div('y-axis source'),
-        dcc.Dropdown(id='header_drop_y', placeholder='y(s)',
-                     options=[], multi=True, className='drop'),
-        daq.BooleanSwitch(id='spectrum_button',
-                          disabled=True, label='Spectrum')
-    ], className='input-div'),
+        html.Div([
+            html.Div('y-axis source'),
+            dcc.Dropdown(id='header_drop_y', placeholder='y(s)',
+                         options=[], multi=True, className='drop'),
+
+        ], className='input-div mlr'),
+        daq.BooleanSwitch(id='spectrum_button', disabled=True, label='Spectrum', className='mlr')
+        ], className='hfill flx rw sp-ev'),
     html.Div([
         html.Div('secondary-y-axis source'), dcc.Dropdown(id='header_drop_alty', placeholder='alt y(s)',
                                                           options=[], multi=True, className='drop')
-    ], className='input-div'),
-], className='flx cl hfill sp-ev')
+    ], className='input-div mlr'),
+], className='flx cl left-align sp-ev')
 
 figure_layout = html.Div([
     dcc.Input(id='x_label', placeholder='x-axis label..',
