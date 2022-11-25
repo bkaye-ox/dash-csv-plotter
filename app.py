@@ -14,6 +14,8 @@ import numpy as np
 
 import math
 import base64
+import io
+import csv
 
 app = DashProxy(__name__,
                 prevent_initial_callbacks=True,
@@ -173,24 +175,24 @@ def file_ready(list_of_contents, list_of_names):
 
 
 def parse_csv(string, lb='\r\n', quote='"', delim=','):
-    el_start = 0
-    hold = False
+    # el_start = 0
+    # hold = False
 
-    rows = [[]]
-    for k, s in enumerate(string):
-        hold = not hold if s == quote else hold
+    # rows = [[]]
+    # for k, s in enumerate(string):
+    #     hold = not hold if s == quote else hold
 
-        if not hold and s == delim:
-            rows[-1].append(string[el_start:k])
-            el_start = k+1
-        if s == '\r' and string[k:k+2] == lb:
-            rows[-1].append(string[el_start:k])
-            row_start = k+2
-            el_start = k+2
-            hold = False
-            rows.append([])
-    return rows
-
+    #     if not hold and s == delim:
+    #         rows[-1].append(string[el_start:k])
+    #         el_start = k+1
+    #     if s == '\r' and string[k:k+2] == lb:
+    #         rows[-1].append(string[el_start:k])
+    #         row_start = k+2
+    #         el_start = k+2
+    #         hold = False
+    #         rows.append([])
+    # return rows
+    return [row for row in csv.reader(io.StringIO(string))]
 
 @app.callback(Output('sidebar', 'is_open'), Input('sidebar-open', 'n_clicks'), State('sidebar', 'is_open'))
 def open_sb(n_clicks, open):
@@ -443,4 +445,5 @@ def get_col_val(col_idxs, r):
 
 
 if __name__ == '__main__':
+
     app.run_server(debug=True)

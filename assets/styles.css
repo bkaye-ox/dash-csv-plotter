@@ -30,7 +30,7 @@
     border-collapse: separate;
     height: 36px;
     overflow: hidden;
-    padding-left: 0;
+    padding-left: 0.3em;
     padding-right: 0;
     width: 100%;
 }
