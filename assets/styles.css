@@ -7,14 +7,18 @@
 .hdr {
     background-color: var(--org-bl);
     color: #fff;
-    height: 6.5rem;
+    padding-bottom: 0.5rem;
+    align-items: end;
+}
+
+.hdr > * {
+    margin-top: 0.5em;
 }
 
 .app-body {
-    width: 100%;
-    max-height: 89vh;
-    min-height: 89vh;
-    height: 89vh;
+    width: 100vw;
+    max-width: 100vw;
+    flex:1;
 }
 
 .app-cont {
@@ -81,21 +85,25 @@ body {
 
 .status {
 
-    border-width: 1px;
+    border-width: 0.2em;
     border-style: dashed;
     border-radius: .5rem;
     text-align: center;
 
-    font-size: 1.5vw;
+    font-size: 2vh;
     padding: 0.5em;
     margin-left: 1em;
     margin-right: 1em;
-    color: #413f40;
-    border-color: #413f40;
+    color: #ebebeb;
+    border-color: #e9e9e9;
 }
 
 .header-button {
-    font-size: 1.5vw;
+    font-size: 3vh;
+}
+
+.wrap{
+    flex-wrap: wrap;
 }
 
 .upload {
@@ -104,7 +112,7 @@ body {
     border-radius: .5rem;
     text-align: center;
 
-    font-size: 1.5vw;
+    font-size: 3vh;
     padding: 0.5em;
     margin-left: 1em;
     margin-right: 1em;
@@ -133,7 +141,7 @@ body {
 .header-h1 {
     margin-left: 1em;
     margin-right: 1em;
-    font-size: 3vw;
+    font-size: 4vh;
 }
 
 .flx {

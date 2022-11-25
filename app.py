@@ -26,17 +26,17 @@ store = html.Div([dcc.Store(id='file_memory', data=[None, None]),
 
 
 upload_bar = html.Div([
-    dcc.Upload('Upload or drag files here',
-               id='upload-data', className='upload'),
-    html.Div('Current file: .', id='status_text', className='status')
+    
 ], className='flx rw sp-ev')
 
 header = html.Div([
-    html.H1('Analysis Suite', className='header-h1'),
-    upload_bar,
+    html.Div('Analysis Suite', className='header-h1'),
+    dcc.Upload('Upload or drag files here',
+               id='upload-data', className='upload'),
+    html.Div('Current file: .', id='status_text', className='status'),
     dbc.Button(html.Div([html.I(className="bi bi-list me-2"),
                ' Controls'], className='header-button'), color="secondary", id='sidebar-open'),
-], className='flx rw hfill sp-ev hdr')
+], className='hdr flx rw hfill sp-ev wrap')
 
 
 figure_source = html.Div([
