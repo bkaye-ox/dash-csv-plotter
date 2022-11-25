@@ -1,4 +1,4 @@
-from dash import Dash, html, dcc
+from dash import Dash, html, dcc, ctx
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import State, Output, DashProxy, Input, MultiplexerTransform
 import dash_daq as daq
@@ -9,6 +9,7 @@ import plotly.subplots as psp
 
 import pandas as pd
 import scipy.signal as sps
+import scipy as sp
 import numpy as np
 
 import math
@@ -26,7 +27,7 @@ store = html.Div([dcc.Store(id='file_memory', data=[None, None]),
 
 
 upload_bar = html.Div([
-    
+
 ], className='flx rw sp-ev')
 
 header = html.Div([
@@ -57,10 +58,17 @@ figure_source = html.Div([
                                                               options=[], multi=True, className='drop')
         ], className='input-div'),
     ], style={'width': '80%'}, className='left-align flx cl'),
-    html.Div(
+    html.Div([
         daq.BooleanSwitch(id='spectrum_button', disabled=True,
                           label='Spectrum'),
-    ),
+        daq.BooleanSwitch(id='filter_button', disabled=False,
+                          label='Filter'),
+        html.Div([
+            html.Div('window size'),
+            dcc.Input(id='filt_win', value=61, type='number',
+                         className='num-input')
+        ], className='small-input-div'),
+    ], className='flex cl'),
 ], className='flx rw left-align sp-ev hfill')
 
 figure_layout = html.Div([
@@ -127,15 +135,15 @@ app.layout = html.Div([
         header,
         html.Div([
             html.Div(dcc.Graph(id='graph', className='hfill graph-container'),
-                    
-            className='graph-sizer')  # graph_controls,
+
+                     className='graph-sizer')  # graph_controls,
 
         ], className='flx cl str app-body'),
     ], className='app-arranger')
 ], className='app-cont')
 
 
-@app.callback([Output('series_cache', 'data'), Output('file_memory', 'data'), Output('sidebar','is_open')], Input('upload-data', 'contents'),
+@app.callback([Output('series_cache', 'data'), Output('file_memory', 'data'), Output('sidebar', 'is_open')], Input('upload-data', 'contents'),
               State('upload-data', 'filename'))
 def file_ready(list_of_contents, list_of_names):
     if list_of_contents is None:
@@ -191,8 +199,8 @@ def open_sb(n_clicks, open):
 
 @app.callback(Output('graph', 'figure'), Output('series_cache', 'data'),
               Input('update_graph', 'data'),
-              State('series_cache', 'data'), State('file_memory', 'data'), State('header_drop_x', 'value'), State('header_drop_y', 'value'), State('header_drop_alty', 'value'), State('index_range', 'data'), State('spectrum_button', 'on'), State('x_label', 'value'), State('y_label', 'value'), Input('title_in', 'value'))
-def graph_update(_, cache, csv, hx, hy, hay, range, spectrum, xlabel, ylabel, title):
+              State('series_cache', 'data'), State('file_memory', 'data'), State('header_drop_x', 'value'), State('header_drop_y', 'value'), State('header_drop_alty', 'value'), State('index_range', 'data'), State('spectrum_button', 'on'), State('filter_button', 'on'), State('filt_win', 'value'), State('x_label', 'value'), State('y_label', 'value'), State('title_in', 'value'))
+def graph_update(_, cache, csv, hx, hy, hay, range, spectrum, filter_on, filt_window, xlabel, ylabel, title):
     if not hx or (not hy and not hay):
         raise PreventUpdate
 
@@ -211,7 +219,9 @@ def graph_update(_, cache, csv, hx, hy, hay, range, spectrum, xlabel, ylabel, ti
             hy, list) or isinstance(hy, tuple) else None
         fig = make_spectrum(hx, hy_singleton, new_cache, range)
     else:
-        fig = make_fig(hx, hy, hay, new_cache, range)
+        filt = (filter_on, filt_window)
+
+        fig = make_fig(hx, hy, hay, new_cache, range, filt)
 
     fig['layout']['xaxis']['title'] = xlabel
     fig['layout']['yaxis']['title'] = ylabel
@@ -255,7 +265,7 @@ def get_time(csv):
 
 
 @ app.callback(Output('update_graph', 'data'),  # Output('title_in', 'value'), Output('x_label', 'value'), Output('y_label', 'value'),
-               Input('header_drop_x', 'value'), Input('header_drop_y', 'value'), Input(
+               Input('filter_button', 'on'), Input('filt_win', 'value'), Input('header_drop_x', 'value'), Input('header_drop_y', 'value'), Input(
                    'header_drop_alty', 'value'), Input('spectrum_button', 'on'), Input('index_range', 'data'), Input('x_label', 'value'), Input('y_label', 'value'), Input('title_in', 'value'),
                State('update_graph', 'data'))
 def update_fig_cb(*args):
@@ -265,7 +275,7 @@ def update_fig_cb(*args):
     #new_cache, f'{header_x} vs. {",".join(header_y)}', f'{header_x}', f'{",".join(header_y)}'
 
 
-def make_fig(h_x, h_ys, h_ays, cache, id_range):
+def make_fig(h_x, h_ys, h_ays, cache, id_range, filt):
     h_ys = (h_ys,) if isinstance(h_ys, str) else tuple(
         h_ys) if isinstance(h_ys, list) else h_ys
     h_ays = (h_ays,) if isinstance(h_ays, str) else tuple(
@@ -277,11 +287,16 @@ def make_fig(h_x, h_ys, h_ays, cache, id_range):
     if not (x_c and all(y_c)):
         raise PreventUpdate
 
+    if filt[0]:
+        y_c = [filter(y, filt[1]) for y in y_c]
     x = x_c[id_range[0]:id_range[1]]
     ys = [y[id_range[0]:id_range[1]] for y in y_c]
 
     if h_ays is not None:
         alt_y_c = [cache.get(hy) for hy in h_ays]
+
+        if filt[0]:
+            alt_y_c = [filter(y, filt[1]) for y in alt_y_c]
         alt_ys = [y[id_range[0]:id_range[1]] for y in alt_y_c]
 
     if h_ays is not None:
@@ -297,6 +312,14 @@ def make_fig(h_x, h_ys, h_ays, cache, id_range):
         fig.add_traces(traces)
 
     return fig
+
+
+def filter(series, window):
+
+    nan_as_zeros = tuple(0 if math.isnan(yk) else yk for yk in series)
+
+    return sp.ndimage.uniform_filter1d(
+        nan_as_zeros, window, mode='constant', cval=0)
 
 
 @app.callback(Output('time_switch', 'disabled'), Output('slider', 'disabled'), Input('drop_time', 'value'))
