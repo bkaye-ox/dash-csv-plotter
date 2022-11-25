@@ -2,6 +2,7 @@ from dash import Dash, html, dcc
 from dash.exceptions import PreventUpdate
 from dash_extensions.enrich import State, Output, DashProxy, Input, MultiplexerTransform
 import dash_daq as daq
+import dash_bootstrap_components as dbc
 
 import plotly.graph_objects as go
 import plotly.subplots as psp
@@ -13,8 +14,10 @@ import numpy as np
 import math
 import base64
 
-app = DashProxy(__name__, prevent_initial_callbacks=True,
-                transforms=[MultiplexerTransform()])
+app = DashProxy(__name__,
+                prevent_initial_callbacks=True,
+                transforms=[MultiplexerTransform()],
+                external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
 
 store = html.Div([dcc.Store(id='file_memory', data=[None, None]),
                   dcc.Store(id='series_cache', data={}),
@@ -26,68 +29,104 @@ upload_bar = html.Div([
     dcc.Upload('Upload or drag files here',
                id='upload-data', className='upload'),
     html.Div('Current file: .', id='status_text', className='status')
-], className='flx rw hfill sp-ev')
+], className='flx rw sp-ev')
 
-header = html.Div([html.H1('Analysis Suite', className='header-h1'),
-                  upload_bar], className='flx rw hfill sp-ev hdr')
+header = html.Div([
+    html.H1('Analysis Suite', className='header-h1'),
+    upload_bar,
+    dbc.Button(html.Div([html.I(className="bi bi-list me-2"),
+               ' Controls']), color="secondary", id='sidebar-open'),
+], className='flx rw hfill sp-ev hdr')
+
 
 figure_source = html.Div([
     html.Div([
         html.Div('x-axis source'),
         dcc.Dropdown(id='header_drop_x', placeholder='x',
                      options=[], className='drop')
-    ], className='input-div mlr'),
+    ], className='input-div'),
     html.Div([
         html.Div([
             html.Div('y-axis source'),
             dcc.Dropdown(id='header_drop_y', placeholder='y(s)',
                          options=[], multi=True, className='drop'),
 
-        ], className='input-div mlr'),
-        daq.BooleanSwitch(id='spectrum_button', disabled=True, label='Spectrum', className='mlr')
-        ], className='hfill flx rw sp-ev'),
+        ], className='input-div'),
+        daq.BooleanSwitch(id='spectrum_button', disabled=True,
+                          label='Spectrum'),
+    ], className='flx rw sp-ev'),
     html.Div([
         html.Div('secondary-y-axis source'), dcc.Dropdown(id='header_drop_alty', placeholder='alt y(s)',
                                                           options=[], multi=True, className='drop')
-    ], className='input-div mlr'),
-], className='flx cl left-align sp-ev')
+    ], className='input-div'),
+], className='flx cl left-align sp-ev hfill')
 
 figure_layout = html.Div([
-    dcc.Input(id='x_label', placeholder='x-axis label..',
-              debounce=True, className='input'),
-    dcc.Input(id='y_label', placeholder='y-axis label..',
-              debounce=True, className='input'),
-    dcc.Input(id='title_in', placeholder='title..',
-              debounce=True, className='input'), ], className='flx cl hfill sp-ev str')
+    html.Div([
+        html.Div('x-axis label'),
+        dcc.Input(id='x_label', placeholder='x-axis label..',
+                  debounce=True, className='input'),
+    ], className='input-div'),
+    html.Div([
+        html.Div('y-axis label'),
+        dcc.Input(id='y_label', placeholder='y-axis label..',
+                  debounce=True, className='input'),
+    ], className='input-div'),
+    html.Div([
+        html.Div('plot title'),
+        dcc.Input(id='title_in', placeholder='title..',
+                  debounce=True, className='input'),
+    ], className='input-div'),
+
+
+], className='flx cl left-align sp-ev hfill')
 
 figure_time = html.Div([
-    daq.BooleanSwitch(id='time_switch', on=False,
-                      label='Enable time source', labelPosition='left'),
     html.Div([
-
         html.Div([
             html.Div('time source'),
             dcc.Dropdown(id='drop_time', placeholder='TimeS',
                          options=[], className='drop')
-        ]),
-    ], className='flx rw hfill sp-bt no-wrap'),
+
+        ], className='input-div'),
+        daq.BooleanSwitch(id='time_switch', on=False, disabled=True,
+                             label='Enable'),
+
+    ], className='flx rw sp-ev'),
     dcc.RangeSlider(0, 0, value=[0, 0], id='slider', className='slider'),
 ], className='flx cl hfill left-align str sp-ev')
 
-graph_controls = html.Div([
-    figure_source,
-    figure_layout,
-    figure_time
-], className='flx rw hfill sp-ev', style={'minHeight': '6em'})
+sidebar = dbc.Offcanvas(
+    # html.Div([
+    #     figure_source,
+    #     figure_time,
+    #     figure_layout,
+    # ]),
+    dbc.ListGroup([
+        dbc.ListGroupItem(figure_source, className='sidebar-cont'),
+        dbc.ListGroupItem(figure_time, className='sidebar-cont'),
+        dbc.ListGroupItem(figure_layout, className='sidebar-cont'),
+    ]),
+    id="sidebar",
+    title="Title",
+    is_open=False,)
+
+# graph_controls = html.Div([
+#     figure_source,
+#     figure_layout,
+#     figure_time
+# ], className='flx rw hfill sp-ev', style={'minHeight': '6em'})
 
 
 app.layout = html.Div([
     store,
+    sidebar,
     html.Div([
         header,
         html.Div([
-            graph_controls,
-            dcc.Graph(id='graph', style={'height': '70vh'}, className='hfill'),
+            # graph_controls,
+            dcc.Graph(id='graph', style={
+                      'height': '70vh'}, className='hfill graph-container'),
         ], className='app-body flx cl str sp-ev'),
     ], className='app-arranger')
 ], className='app-cont')
@@ -140,6 +179,11 @@ def parse_csv(string, lb='\r\n', quote='"', delim=','):
             hold = False
             rows.append([])
     return rows
+
+
+@app.callback(Output('sidebar', 'is_open'), Input('sidebar-open', 'n_clicks'), State('sidebar', 'is_open'))
+def open_sb(n_clicks, open):
+    return not open
 
 
 @app.callback(Output('graph', 'figure'), Output('series_cache', 'data'),

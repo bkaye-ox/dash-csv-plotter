@@ -72,7 +72,22 @@ padding-right: 1em;
 }
 
 .input-div {
+    margin-right: 0.5em;
     margin-bottom: 0.5em;
+    max-width: 30em;
+}
+
+.sidebar-cont {
+    padding:0.5em;
+}
+
+#spectrum-button {
+    width:min-content;
+}
+
+.mlr {
+    margin-left:1em;
+    margin-right: 1em;
 }
 
 .status {
@@ -152,6 +167,11 @@ padding-right: 1em;
 }
 
 .slider {
-    min-width: 80%;
+    min-width: 100%;
 }
 
+.graph-container {
+    width: 90%;
+    aspect-ratio: 16 / 9;
+
+}
