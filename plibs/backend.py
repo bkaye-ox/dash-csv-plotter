@@ -8,6 +8,37 @@ import scipy as sp
 import numpy as np
 
 import math
+import base64
+import io
+
+
+def format_cols(col_x, cols_y, cols_y2):
+    if cols_y is None:
+        cols_y = ()
+    if cols_y2 is None:
+        cols_y2 = ()
+
+    def format(cols):
+        cols = (cols,) if isinstance(cols, str) else tuple(
+            cols) if isinstance(cols, list) else cols
+
+    return col_x, format(cols_y), format(cols_y2)
+
+
+def extract_data(fn, upload_contents):
+    content_type, content_b64 = upload_contents.split(',')
+
+    df = None
+
+    if '.csv' in fn:
+        content_str = base64.b64decode(content_b64).decode()
+        df = pd.read_csv(io.StringIO(content_str))
+    elif '.feather' in fn:
+        content = base64.b64decode(content_b64)
+        df = pd.read_feather(io.BytesIO(content))
+
+    return df.to_dict(orient='list') if df is not None else df
+
 
 def make_spectrum(col_x, col_y, df, ranges, fns):
     trs = []

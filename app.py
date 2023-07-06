@@ -4,18 +4,11 @@ from dash_extensions.enrich import State, Output, DashProxy, Input, MultiplexerT
 import dash_daq as daq
 import dash_bootstrap_components as dbc
 
-import plotly.graph_objects as go
-import plotly.subplots as psp
-
 import pandas as pd
-import scipy.signal as sps
-import scipy as sp
-import numpy as np
+
 
 import math
-import base64
-import io
-import csv
+
 
 import plibs.backend as lb
 
@@ -189,19 +182,9 @@ def file_ready(list_of_contents, list_of_names, file_mem, cache, fn_select):
         cache = {}
 
     for fn, contents in zip(list_of_names, list_of_contents):
-        content_type, content_b64 = contents.split(',')
-
-        df = None
-
-        if '.csv' in fn:
-            content_str = base64.b64decode(content_b64).decode()
-            df = pd.read_csv(io.StringIO(content_str))
-        elif '.feather' in fn:
-            content = base64.b64decode(content_b64)
-            df = pd.read_feather(io.BytesIO(content))
-
+        df = lb.extract_data(fn, contents)
         if df is not None:
-            cache[fn] = df.to_dict(orient='list')
+            cache[fn] = df
 
     fn_select = list_of_names if fn_select is None else fn_select + list_of_names
 
@@ -224,52 +207,47 @@ def open_sb(n_clicks, open):
               State('x_label', 'value'), State(
                   'y_label', 'value'), State('alt_y_label', 'value'), State('title_in', 'value'),
               State('bool_radio', 'data'))
-def graph_update(_, fns, dataframe, csv, hx, hy, hay, range_, filter_on, filt_window, xlabel, ylabel, altyabel, title, plot_type):
+def graph_update(_, fns, dataframe, csv, col_x, cols_y, cols_y2, range_, filter_on, filt_window, xlabel, ylabel, altyabel, title, plot_type):
 
     if fns is None or len(fns) == 0:
         raise PreventUpdate
 
-    if (not hy and not hay):
+    col_x, cols_y, cols_y2 = lb.format_cols(col_x, cols_y, cols_y2)
+
+    second_axis = bool(len(cols_y2) > 0)
+
+    if (not cols_y and not cols_y2):
         raise PreventUpdate
 
-    if hy is None:
-        hy = ()
-    if hay is None:
-        hay = ()
-
-    second_axis = bool(hay is not None)
-
-    hy = (hy,) if isinstance(hy, str) else tuple(
-        hy) if isinstance(hy, list) else hy
-    hay = (hay,) if isinstance(hay, str) else tuple(
-        hay) if isinstance(hay, list) else hay
-
-    cols = hy + hay if hx is None else (hx,)+hy+hay
-
-    # new_cache = lb.cache_data(cols, cache, csv, fns)
-    # new_cache = cache
     if plot_type == 'lines_bool':
         filt = (filter_on, filt_window)
 
-        fig = lb.make_fig(hx, hy, hay, dataframe, range_, filt, fns)
+        fig = lb.make_fig(col_x, cols_y, cols_y2, dataframe, range_, filt, fns)
+
     if plot_type == 'spectrum_bool':
+
         h_st = None
-        if len(hy) == 1:
-            h_st = hy[0]
-        elif len(hay) == 1:
-            h_st = hay[0]
+        if len(cols_y) == 1:
 
-        fig = lb.make_spectrum(hx, h_st, dataframe, range_, fns)
+            h_st = cols_y[0]
+
+        elif len(cols_y2) == 1:
+
+            h_st = cols_y2[0]
+
+        fig = lb.make_spectrum(col_x, h_st, dataframe, range_, fns)
+
     if plot_type == 'box_bool':
-        fig = lb.make_box(hx, hy, fns, dataframe)
 
-    # fig['layout']['xaxis']['title'] = xlabel
-    # fig['layout']['yaxis']['title'] = ylabel
-    # if second_axis:
-    #     fig['layout']['yaxis2']['title'] = altyabel
-    # fig['layout']['title'] = title
+        fig = lb.make_box(col_x, cols_y, fns, dataframe)
 
-    # , f'{hx} vs. {",".join(hy)}', f'{hx}', f'{",".join(hy)}'
+    fig['layout']['xaxis']['title'] = xlabel
+    fig['layout']['yaxis']['title'] = ylabel
+    if second_axis:
+        fig['layout']['yaxis2']['title'] = altyabel
+    fig['layout']['title'] = title
+
+    # , f'{col_x} vs. {",".join(cols_y)}', f'{col_x}', f'{",".join(hy)}'
     return fig
 
 
