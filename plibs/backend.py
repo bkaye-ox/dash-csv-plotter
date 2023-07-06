@@ -53,6 +53,10 @@ def get_col_val(col_idxs, r):
         yield val
 
 
+def trace(x, y):
+    return go.Scatter(x=x, y=y)
+
+
 def multiplot(*, fig,  x, y, y2=None):
     if y2 is None:
         # fig = go.Figure()
@@ -63,16 +67,16 @@ def multiplot(*, fig,  x, y, y2=None):
 
     if len(y) > 0 and hasattr(y[0], '__len__'):
         for y_k in y:
-            fig.add_trace(x, y_k, **secondary)
+            fig.add_trace(trace(x, y_k), **secondary)
     else:
-        fig.add_trace(y, **secondary)
+        fig.add_trace(trace(x, y), **secondary)
 
     if y2 is not None:
         if len(y2) > 0 and hasattr(y2[0], '__len__'):
             for y2_k in y2:
-                fig.add_trace(x, y2_k, **secondary)
+                fig.add_trace(trace(x, y2_k), **secondary)
         else:
-            fig.add_trace(y2, **secondary)
+            fig.add_trace(trace(x, y2), **secondary)
 
 
 def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
@@ -90,38 +94,6 @@ def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
         multiplot(fig=fig, x=x, y=y, y2=y2)
 
     return fig
-
-
-# def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
-#     # trs = []
-#     # scnds = []
-
-#     fn_ = fns[0]
-#     h_y = h_ys[0]
-
-#     plot_dict = data[fn_]
-#     return px.line(x=plot_dict[h_x], y=plot_dict[h_y])
-
-#     for fn in fns:
-#         cache = plot_dict.get(fn)
-
-#         rng = id_range[fn] if type(
-#             id_range) is dict and id_range.get(fn) else [0, None]
-
-#         trs_fn, seconds_fn = make_fig_traces(
-#             h_x, h_ys, h_ays, cache, rng, filt)
-
-#         trs.extend(trs_fn)
-#         if seconds_fn is not None:
-#             scnds.extend(seconds_fn)
-
-#     if h_ays is not None and len(h_ays) > 0:
-#         fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
-#         fig.add_traces(trs, secondary_ys=scnds)
-#     else:
-#         fig = psp.make_subplots()
-#         fig.add_traces(trs)
-#     return fig
 
 
 def make_fig_traces(h_x, h_ys, h_ays, cache, id_range, filt):
