@@ -60,29 +60,31 @@ def trace(x, y):
 def multiplot(*, fig,  x, y, y2=None):
     if y2 is None:
         # fig = go.Figure()
-        secondary = dict()
+        left_arg = dict()
     else:
         # fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
-        secondary = dict(secondary_y=True)
+        left_arg = dict(secondary_y=False)
+        right_arg = dict(secondary_y=True)
+        
 
     if len(y) > 0 and hasattr(y[0], '__len__'):
         for y_k in y:
-            fig.add_trace(trace(x, y_k), **secondary)
+            fig.add_trace(trace(x, y_k), **left_arg)
     else:
-        fig.add_trace(trace(x, y), **secondary)
+        fig.add_trace(trace(x, y), **left_arg)
 
     if y2 is not None:
         if len(y2) > 0 and hasattr(y2[0], '__len__'):
             for y2_k in y2:
-                fig.add_trace(trace(x, y2_k), **secondary)
+                fig.add_trace(trace(x, y2_k), **right_arg)
         else:
-            fig.add_trace(trace(x, y2), **secondary)
+            fig.add_trace(trace(x, y2), **right_arg)
 
 
 def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
 
     secondary = bool(len(h_ays) > 0)
-    fig = go.Figure() if secondary else psp.make_subplots(
+    fig = go.Figure() if not secondary else psp.make_subplots( 
         specs=[[{"secondary_y": True}]])
 
     for fn in fns:
