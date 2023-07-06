@@ -19,7 +19,7 @@ def format_cols(col_x, cols_y, cols_y2):
         cols_y2 = ()
 
     def format(cols):
-        cols = (cols,) if isinstance(cols, str) else tuple(
+        return (cols,) if isinstance(cols, str) else tuple(
             cols) if isinstance(cols, list) else cols
 
     return col_x, format(cols_y), format(cols_y2)
@@ -60,7 +60,7 @@ def make_spectrum_tr(col_x, col_y, df, rng):
 
     y = df.get(col_y)[rng[0]:rng[1]]
     f, Pxx = sps.periodogram(x=y, fs=fs)
-
+    Pxx = Pxx/Pxx.max()
     tr = go.Scatter(x=f, y=Pxx, mode='lines')
 
     return tr
