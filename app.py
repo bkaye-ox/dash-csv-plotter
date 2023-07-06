@@ -185,22 +185,27 @@ def file_ready(list_of_contents, list_of_names, file_mem, cache, fn_select):
     if list_of_contents is None:
         raise PreventUpdate
 
-    # fn = list_of_names
-    # contents = list_of_contents
+    if cache is None:
+        cache = {}
 
     for fn, contents in zip(list_of_names, list_of_contents):
         content_type, content_b64 = contents.split(',')
-        content_str = base64.b64decode(content_b64).decode()
 
-        df = pd.read_csv(io.StringIO(content_str))
-        if cache is None:
-            cache = {}
+        df = None
 
-        cache[fn] = df.to_dict(orient='list')
+        if '.csv' in fn:
+            content_str = base64.b64decode(content_b64).decode()
+            df = pd.read_csv(io.StringIO(content_str))
+        elif '.feather' in fn:
+            content = base64.b64decode(content_b64)
+            df = pd.read_feather(io.BytesIO(content))
+
+        if df is not None:
+            cache[fn] = df.to_dict(orient='list')
 
     fn_select = list_of_names if fn_select is None else fn_select + list_of_names
 
-    return cache, True, list(cache[fn].keys()), fn_select
+    return cache, True, list(cache.keys()), fn_select
 
 
 @app.callback(Output('sidebar', 'is_open'), Input('sidebar-open', 'n_clicks'), State('sidebar', 'is_open'))
@@ -263,8 +268,6 @@ def graph_update(_, fns, dataframe, csv, hx, hy, hay, range_, filter_on, filt_wi
     # if second_axis:
     #     fig['layout']['yaxis2']['title'] = altyabel
     # fig['layout']['title'] = title
-
-    
 
     # , f'{hx} vs. {",".join(hy)}', f'{hx}', f'{",".join(hy)}'
     return fig
