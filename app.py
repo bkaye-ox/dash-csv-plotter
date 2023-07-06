@@ -17,6 +17,22 @@ import base64
 import io
 import csv
 
+import plibs.backend as lb
+
+
+def bool_radio(n,  labels=None, default=None,):
+    if default is None:
+        default = [True] + [False for k in range(n-1)]
+    if labels is None:
+        labels = [(f'boolradio_{chr(97+k)}',
+                   f'boolradio_{chr(97+k)}') for k in range(n)]
+    return html.Div([
+        dcc.Store(id='bool_radio', data='lines_bool')]+list(daq.BooleanSwitch(id=id, on=on, disabled=False,
+                                                                              label=label) for on, (id, label) in zip(default, labels)),
+        className='flx rw'
+    )
+
+
 app = DashProxy(__name__,
                 prevent_initial_callbacks=True,
                 transforms=[MultiplexerTransform()],
@@ -35,9 +51,9 @@ upload_bar = html.Div([
 header = html.Div([
     html.Div('Analysis Suite', className='header-h1'),
     dcc.Upload('Upload or drag files here',
-               id='upload-data', className='upload'),
+               id='upload-data', className='upload', multiple=True),
     html.Div(
-    dcc.Dropdown(id='file_selector', className='drop', multi=True, options=[]), style={'width':'20em'}),
+        dcc.Dropdown(id='file_selector', className='drop', multi=True, options=[]), style={'width': '20em'}),
     dbc.Button(html.Div([html.I(className="bi bi-list me-2"),
                ' Controls'], className='header-button'), color="secondary", id='sidebar-open'),
     html.Div(id='status_text')
@@ -63,8 +79,8 @@ figure_source = html.Div([
         ], className='input-div'),
     ], style={'width': '80%'}, className='left-align flx cl'),
     html.Div([
-        daq.BooleanSwitch(id='spectrum_button', disabled=True,
-                          label='Spectrum'),
+        # daq.BooleanSwitch(id='spectrum_bool', disabled=True,
+        #                   label='Spectrum'),
         daq.BooleanSwitch(id='filter_button', disabled=False,
                           label='Filter'),
         html.Div([
@@ -84,6 +100,11 @@ figure_layout = html.Div([
     html.Div([
         html.Div('y-axis label'),
         dcc.Input(id='y_label', placeholder='y-axis label..',
+                  debounce=True, className='input'),
+    ], className='input-div'),
+    html.Div([
+        html.Div('secondary y-axis label'),
+        dcc.Input(id='alt_y_label', placeholder='y-axis label..',
                   debounce=True, className='input'),
     ], className='input-div'),
     html.Div([
@@ -110,6 +131,15 @@ figure_time = html.Div([
     dcc.RangeSlider(0, 0, value=[0, 0], id='slider', className='slider'),
 ], className='flx cl hfill left-align str sp-ev')
 
+figure_wildcard = html.Div(
+    bool_radio(3, [('lines_bool', 'Normal'),
+               ('spectrum_bool', 'Spectrum'), ('box_bool', 'Box')]),
+    className='hfill')
+
+figure_filter_settings = html.Div(
+
+)
+
 sidebar = dbc.Offcanvas(
     # html.Div([
     #     figure_source,
@@ -120,6 +150,7 @@ sidebar = dbc.Offcanvas(
         dbc.ListGroupItem(figure_source, className='sidebar-cont'),
         dbc.ListGroupItem(figure_time, className='sidebar-cont'),
         dbc.ListGroupItem(figure_layout, className='sidebar-cont'),
+        dbc.ListGroupItem(figure_wildcard, className='sidebar-cont'),
     ]),
     id="sidebar",
     title="Graph controls",
@@ -153,49 +184,28 @@ def file_ready(list_of_contents, list_of_names, file_mem, cache, fn_select):
     if list_of_contents is None:
         raise PreventUpdate
 
-    fn = list_of_names
-    contents = list_of_contents
+    # fn = list_of_names
+    # contents = list_of_contents
 
-    content_type, content_b64 = contents.split(',')
-    content_str = base64.b64decode(content_b64).decode()
+    for fn, contents in zip(list_of_names, list_of_contents):
+        content_type, content_b64 = contents.split(',')
+        content_str = base64.b64decode(content_b64).decode()
 
-    rows = parse_csv(content_str)
-    csv = (rows[0], rows[2:-1])
+        rows = lb.parse_csv(content_str)
+        csv = (rows[0], rows[2:-1])
 
-    new_file_mem = file_mem | {fn: csv}
+        file_mem = file_mem | {fn: csv}
 
-    time = get_time(csv)
-    new_cache = {fn: {}}
-    if time is not None:
-        csv[0].append('TimeS')
-        new_cache = {fn: {'TimeS': time}}
+        time = lb.get_time(csv)
+        new_cache = {fn: {}}
+        if time is not None:
+            csv[0].append('TimeS')
+            new_cache = {fn: {'TimeS': time}}
+        cache = cache | new_cache
 
-    if fn_select is not None:
-        fn_select.append(fn)
-    else:
-        fn_select = [fn]
-    return cache | new_cache, new_file_mem, True, list(new_file_mem.keys()), fn_select
+    fn_select = list_of_names if fn_select is None else fn_select + list_of_names
 
-
-def parse_csv(string, lb='\r\n', quote='"', delim=','):
-    # el_start = 0
-    # hold = False
-
-    # rows = [[]]
-    # for k, s in enumerate(string):
-    #     hold = not hold if s == quote else hold
-
-    #     if not hold and s == delim:
-    #         rows[-1].append(string[el_start:k])
-    #         el_start = k+1
-    #     if s == '\r' and string[k:k+2] == lb:
-    #         rows[-1].append(string[el_start:k])
-    #         row_start = k+2
-    #         el_start = k+2
-    #         hold = False
-    #         rows.append([])
-    # return rows
-    return [row for row in csv.reader(io.StringIO(string))]
+    return cache, file_mem, True, list(file_mem.keys()), fn_select
 
 
 @app.callback(Output('sidebar', 'is_open'), Input('sidebar-open', 'n_clicks'), State('sidebar', 'is_open'))
@@ -205,36 +215,59 @@ def open_sb(n_clicks, open):
 
 @app.callback(Output('graph', 'figure'), Output('series_cache', 'data'),
               Input('update_graph', 'data'),
-              State('file_selector', 'value'), State('series_cache', 'data'), State('file_memory', 'data'), State('header_drop_x', 'value'), State('header_drop_y', 'value'), State('header_drop_alty', 'value'), State('index_range', 'data'), State('spectrum_button', 'on'), State('filter_button', 'on'), State('filt_win', 'value'), State('x_label', 'value'), State('y_label', 'value'), State('title_in', 'value'))
-def graph_update(_, fns, cache, csv, hx, hy, hay, range, spectrum, filter_on, filt_window, xlabel, ylabel, title):
+              State('file_selector', 'value'), State(
+                  'series_cache', 'data'), State('file_memory', 'data'),
+              State('header_drop_x', 'value'), State('header_drop_y',
+                                                     'value'), State('header_drop_alty', 'value'),
+              State('index_range', 'data'), State(
+                  'filter_button', 'on'), State('filt_win', 'value'),
+              State('x_label', 'value'), State(
+                  'y_label', 'value'), State('alt_y_label', 'value'), State('title_in', 'value'),
+              State('bool_radio', 'data'))
+def graph_update(_, fns, cache, csv, hx, hy, hay, range, filter_on, filt_window, xlabel, ylabel, altyabel, title, plot_type):
 
     if fns is None or len(fns) == 0:
         raise PreventUpdate
 
-    if not hx or (not hy and not hay):
+    if (not hy and not hay):
         raise PreventUpdate
+
+    if hy is None:
+        hy = ()
+    if hay is None:
+        hay = ()
+
+    second_axis = bool(hay is not None)
+
 
     hy = (hy,) if isinstance(hy, str) else tuple(
         hy) if isinstance(hy, list) else hy
     hay = (hay,) if isinstance(hay, str) else tuple(
         hay) if isinstance(hay, list) else hay
 
-    cols = (hx,) + hy + \
-        hay if hay is not None else (hx,) + hy
+    cols = hy + hay if hx is None else (hx,)+hy+hay
 
-    new_cache = cache_data(cols, cache, csv, fns)
+    new_cache = lb.cache_data(cols, cache, csv, fns)
 
-    if spectrum:
-        hy_singleton = hy if isinstance(hy, str) else hy[0] if isinstance(
-            hy, list) or isinstance(hy, tuple) else None
-        fig = make_spectrum(hx, hy_singleton, new_cache, range, fns)
-    else:
+    if plot_type == 'lines_bool':
         filt = (filter_on, filt_window)
 
-        fig = make_fig(hx, hy, hay, new_cache, range, filt, fns)
+        fig = lb.make_fig(hx, hy, hay, new_cache, range, filt, fns)
+    if plot_type == 'spectrum_bool':
+        h_st = None
+        if len(hy) == 1:
+            h_st = hy[0]
+        elif len(hay) == 1:
+            h_st = hay[0]
+
+        fig = lb.make_spectrum(hx, h_st, new_cache, range, fns)
+    if plot_type == 'box_bool':
+        fig = lb.make_box(hx, hy, fns, new_cache)
 
     fig['layout']['xaxis']['title'] = xlabel
     fig['layout']['yaxis']['title'] = ylabel
+    if second_axis:
+        fig['layout']['yaxis2']['title'] = altyabel
     fig['layout']['title'] = title
 
     # , f'{hx} vs. {",".join(hy)}', f'{hx}', f'{",".join(hy)}'
@@ -246,8 +279,8 @@ def graph_update(_, fns, cache, csv, hx, hy, hay, range, spectrum, filter_on, fi
                State('file_selector', 'value'))
 def update_output(csv, fns):
 
-
-    disp_headers = list(set.intersection(*(set(h for h in csv[fn][0]) for fn in fns)))
+    disp_headers = list(set.intersection(
+        *(set(h for h in csv[fn][0]) for fn in fns)))
     # disp_headers = list(headers[0].intersect(*headers))
     return *(disp_headers for k in range(4)), f'file uploaded'
 
@@ -260,97 +293,15 @@ def update_default_drop(opts):
     return h_x, h_y, h_t
 
 
-def get_time(csv):
-
-    headers = csv[0]
-    time_header = 'PerfusionTime' if 'PerfusionTime' in headers else 'CurrentTicks' if 'CurrentTicks' in headers else None
-
-    if time_header == 'PerfusionTime':
-        return process_cols(time_header, csv)
-    if time_header == 'CurrentTicks':
-        ticks, tps = process_cols((time_header, 'TicksPerSecond'), csv)
-        time = [None for k in range(len(ticks))]
-        time[0] = 0
-        for k in range(1, len(ticks)):
-            time[k] = time[k-1] + (ticks[k] - ticks[k-1])*tps[k]*1e-6
-        return time
-    return None
-
-
 @ app.callback(Output('update_graph', 'data'),  # Output('title_in', 'value'), Output('x_label', 'value'), Output('y_label', 'value'),
                Input('filter_button', 'on'), Input('filt_win', 'value'), Input('header_drop_x', 'value'), Input('header_drop_y', 'value'), Input(
-                   'header_drop_alty', 'value'), Input('spectrum_button', 'on'), Input('index_range', 'data'), Input('x_label', 'value'), Input('y_label', 'value'), Input('title_in', 'value'), Input('file_selector','value'),
+                   'header_drop_alty', 'value'), Input('index_range', 'data'), Input('x_label', 'value'), Input('y_label', 'value'), Input('alt_y_label', 'value'), Input('title_in', 'value'), Input('file_selector', 'value'), Input('bool_radio', 'data'),
                State('update_graph', 'data'))
 def update_fig_cb(*args):
     # header_x, header_y, header_alty,spectrum, range, update_count
     update_count = args[-1]
     return update_count + 1
     #new_cache, f'{header_x} vs. {",".join(header_y)}', f'{header_x}', f'{",".join(header_y)}'
-
-
-def make_fig(h_x, h_ys, h_ays, super_cache, id_range, filt, fns):
-    trs = []
-    scnds = []
-    for fn in fns:
-        cache = super_cache.get(fn)
-
-        trs_fn, seconds_fn = make_fig_traces(
-            h_x, h_ys, h_ays, cache, id_range, filt)
-
-        trs.extend(trs_fn)
-        if seconds_fn is not None:
-            scnds.extend(seconds_fn)
-
-    if h_ays is not None:
-        fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_traces(trs, scnds)
-    else:
-        fig = psp.make_subplots()
-        fig.add_traces(trs)
-    return fig
-
-def make_fig_traces(h_x, h_ys, h_ays, cache, id_range, filt):
-    h_ys = (h_ys,) if isinstance(h_ys, str) else tuple(
-        h_ys) if isinstance(h_ys, list) else h_ys
-    h_ays = (h_ays,) if isinstance(h_ays, str) else tuple(
-        h_ays) if isinstance(h_ays, list) else h_ays
-
-    x_c = cache.get(h_x)
-    y_c = [cache.get(hy) for hy in h_ys]
-
-    if not (x_c and all(y_c)):
-        raise PreventUpdate
-
-    if filt[0]:
-        y_c = [filter(y, filt[1]) for y in y_c]
-    x = x_c[id_range[0]:id_range[1]]
-    ys = [y[id_range[0]:id_range[1]] for y in y_c]
-
-    if h_ays is not None:
-        alt_y_c = [cache.get(hy) for hy in h_ays]
-
-        if filt[0]:
-            alt_y_c = [filter(y, filt[1]) for y in alt_y_c]
-        alt_ys = [y[id_range[0]:id_range[1]] for y in alt_y_c]
-
-    second = None
-    if h_ays is not None:
-        traces = [go.Scatter(x=x, y=yk, name=hyk)
-                  for yk, hyk in zip(ys+alt_ys, h_ys+h_ays)]
-        second = tuple(False for k in range(len(ys))) + \
-            tuple(True for k in range(len(alt_ys)))
-    else:
-        traces = [go.Scatter(x=x, y=yk, name=hyk) for yk, hyk in zip(ys, h_ys)]
-
-    return traces, second
-
-
-def filter(series, window):
-
-    nan_as_zeros = tuple(0 if math.isnan(yk) else yk for yk in series)
-
-    return sp.ndimage.uniform_filter1d(
-        nan_as_zeros, window, mode='constant', cval=0)
 
 
 @app.callback(Output('time_switch', 'disabled'), Output('slider', 'disabled'), Input('drop_time', 'value'))
@@ -371,16 +322,20 @@ def slidercb(value, time_src_enable, cache, time_col):
     if not time_src_enable:
         return [0, None]
 
-    t = cache[time_col]
-    for k, kt in enumerate(t):
-        if k_min == 0 and kt > t_min:
-            k_min = k
-        if k_max is None and kt is not None and kt > t_max:
-            k_max = k
-    return [k_min if k_min is not None else 0, k_max]
+    ranges = {}
+    for fn, v in cache.items():
+        t = v[time_col]
+        for k, kt in enumerate(t):
+            if k_min == 0 and kt > t_min:
+                k_min = k
+            if k_max is None and kt is not None and kt > t_max:
+                k_max = k
+        ranges[fn] = [k_min if k_min is not None else 0, k_max]
+
+    return ranges
 
 
-@app.callback(Output('spectrum_button', 'disabled'), Output('spectrum_button', 'on'), Input('header_drop_x', 'value'), Input('header_drop_y', 'value'), Input('header_drop_alty', 'value'))
+@app.callback(Output('spectrum_bool', 'disabled'), Output('spectrum_bool', 'on'), Input('header_drop_x', 'value'), Input('header_drop_y', 'value'), Input('header_drop_alty', 'value'))
 def update_sb(hx, hy, hay):
     if hx is not None and hy is not None and (hay is None or not hay) and (isinstance(hy, str) or len(hy) == 1):
         return False, False
@@ -388,104 +343,40 @@ def update_sb(hx, hy, hay):
         return True, False
 
 
-def make_spectrum(hx, hy, ch, rng, fns):
-    trs = []
-    for fn in fns:
-        cache = ch.get(fn)
-        trs.append(make_spectrum_tr(hx, hy, cache, rng))
-    fig = psp.make_subplots()
-    fig.add_traces(trs)
-
-
-def make_spectrum_tr(hx, hy, ch, rng):
-    t = ch.get(hx)[rng[0]:rng[1]]
-    fs = 1/np.mean(np.diff(t))
-
-    y = ch.get(hy)[rng[0]:rng[1]]
-    f, Pxx = sps.periodogram(y, fs)
-
-    # fig = psp.make_subplots()
-    tr = go.Scatter(x=f, y=Pxx, mode='lines')
-    # fig.add_trace(tr)
-
-    return tr
-
-
-
 @ app.callback(Output('slider', 'min'), Output('slider', 'max'), Output('slider', 'value'), Input('drop_time', 'value'), State('series_cache', 'data'))
-def droptimecb(inval, cache):
+def droptimecb(time_col, cache):
 
-    if cache.get(inval):
-        time = cache[inval]
-    else:
+    maxt = -math.inf
+    mint = math.inf
+    for _, v in cache.items():
+
+        time = v.get(time_col)
+        if time is None:
+            continue
+        t = tuple(x for x in time if not math.isnan(x))
+        maxt = max(maxt, max(t))
+        mint = min(mint, min(t))
+
+    return mint, maxt, [mint, maxt]
+
+
+@app.callback(Output('bool_radio', 'data'), Output('lines_bool', 'on'), Output('spectrum_bool', 'on'), Output('box_bool', 'on'), Input('lines_bool', 'on'), Input('spectrum_bool', 'on'), Input('box_bool', 'on'))
+def cb_radio_list(*on):
+
+    if not any(on):
+        return 'lines_bool', True, False, False
+
+    triggered_id = ctx.triggered_id
+    val = ctx.inputs
+    if val[f'{triggered_id}.on'] == False:
         raise PreventUpdate
-
-    min_t, max_t = time[0] if time[0] is not None else None, None
-    for k, kt in enumerate(time):
-        if min_t is None and kt:
-            min_t = kt
-        if max_t is None and kt:
-            max_t = kt
-        if kt and kt > max_t:
-            max_t = kt
-
-    max_t = round(max_t, 2)
-
-    return min_t, max_t, [min_t, max_t]
-
-
-def cache_data(cols, cache, csv, fns):
-
-    for fn in fns:
-        fn_csv = csv.get(fn)
-        not_cached = [k for k in cols if not cache.get(k)]
-        cache[fn] = cache[fn] | {col: series for col, series in zip(
-            not_cached, process_cols(not_cached, fn_csv))}
-    return cache
-
-
-def process_cols(cols, csv):
-    headers, rows = csv
-
-    # rows = contents.split('\r\n')
-
-    k_cols = tuple(headers.index(y) for y in cols)
-
-    data = [None for k in range(len(rows))]
-
-    nan_count = [0 for k in range(len(cols))]
-
-    # try cast columns to float
-    for k, row in enumerate(rows):
-        r = row
-
-        data[k] = tuple(v for v in get_col_val(k_cols, r))
-
-        for h, v in enumerate(data[k]):
-            if v is math.nan:
-                nan_count[h] += 1
-
-    # if dtype is not float, revert to string
-    for h, nan_c in enumerate(nan_count):
-        if nan_c > 0.5*len(rows):
-            data[h] = [None for k in range(len(rows))]
-            for k, r in enumerate(rows):
-                try:
-                    data[h][k] = r[k_cols[h]]
-                except:
-                    data[h][k] = ''
-
-    return zip(*data)
-
-
-def get_col_val(col_idxs, r):
-    '''Generator()'''
-    for col in col_idxs:
-        try:
-            val = float(r[col])
-        except:
-            val = math.nan
-        yield val
+    outputs = {
+        'lines_bool': False,
+        'spectrum_bool': False,
+        'box_bool': False,
+    }
+    outputs[triggered_id] = True
+    return triggered_id, *(outputs.values())
 
 
 if __name__ == '__main__':
