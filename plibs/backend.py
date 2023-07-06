@@ -34,7 +34,7 @@ def make_spectrum_tr(hx, hy, ch, rng):
     fs = 1/np.mean(np.diff(t))
 
     y = ch.get(hy)[rng[0]:rng[1]]
-    f, Pxx = sps.lombscargle(x=t, y=y)
+    f, Pxx = sps.periodogram(x=y, fs=fs)
 
     # fig = psp.make_subplots()
     tr = go.Scatter(x=f, y=Pxx, mode='lines')
@@ -65,7 +65,6 @@ def multiplot(*, fig,  x, y, y2=None):
         # fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
         left_arg = dict(secondary_y=False)
         right_arg = dict(secondary_y=True)
-        
 
     if len(y) > 0 and hasattr(y[0], '__len__'):
         for y_k in y:
@@ -84,7 +83,7 @@ def multiplot(*, fig,  x, y, y2=None):
 def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
 
     secondary = bool(len(h_ays) > 0)
-    fig = go.Figure() if not secondary else psp.make_subplots( 
+    fig = go.Figure() if not secondary else psp.make_subplots(
         specs=[[{"secondary_y": True}]])
 
     for fn in fns:
