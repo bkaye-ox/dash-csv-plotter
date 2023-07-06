@@ -53,73 +53,75 @@ def get_col_val(col_idxs, r):
         yield val
 
 
-def cache_data(cols, cache, csv, fns):
-
-    for fn in fns:
-        fn_csv = csv.get(fn)
-        not_cached = [k for k in cols if not cache.get(k)]
-        cache[fn] = cache[fn] | {col: series for col, series in zip(
-            not_cached, process_cols(not_cached, fn_csv))}
-    return cache
-
-
-def process_cols(cols, csv):
-    headers, rows = csv
-
-    # rows = contents.split('\r\n')
-
-    k_cols = tuple(headers.index(y) for y in cols)
-
-    data = [None for k in range(len(rows))]
-
-    nan_count = [0 for k in range(len(cols))]
-
-    # try cast columns to float
-    for k, row in enumerate(rows):
-        r = row
-
-        data[k] = tuple(v for v in get_col_val(k_cols, r))
-
-        for h, v in enumerate(data[k]):
-            if v is math.nan or v == 0.:
-                nan_count[h] += 1
-
-    # if dtype is not float, revert to string
-    for h, nan_c in enumerate(nan_count):
-        if nan_c > 0.5*len(rows):
-            data[h] = [None for k in range(len(rows))]
-            for k, r in enumerate(rows):
-                try:
-                    data[h][k] = r[k_cols[h]]
-                except:
-                    data[h][k] = ''
-
-    return zip(*data)
-
-
-def make_fig(h_x, h_ys, h_ays, super_cache, id_range, filt, fns):
-    trs = []
-    scnds = []
-    for fn in fns:
-        cache = super_cache.get(fn)
-
-        rng = id_range[fn] if type(
-            id_range) is dict and id_range.get(fn) else [0, None]
-
-        trs_fn, seconds_fn = make_fig_traces(
-            h_x, h_ys, h_ays, cache, rng, filt)
-
-        trs.extend(trs_fn)
-        if seconds_fn is not None:
-            scnds.extend(seconds_fn)
-
-    if h_ays is not None and len(h_ays) > 0:
-        fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
-        fig.add_traces(trs, secondary_ys=scnds)
+def multiplot(*, fig,  x, y, y2=None):
+    if y2 is None:
+        # fig = go.Figure()
+        secondary = dict()
     else:
-        fig = psp.make_subplots()
-        fig.add_traces(trs)
+        # fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
+        secondary = dict(secondary_y=True)
+
+    if len(y) > 0 and hasattr(y[0], '__len__'):
+        for y_k in y:
+            fig.add_trace(x, y_k, **secondary)
+    else:
+        fig.add_trace(y, **secondary)
+
+    if y2 is not None:
+        if len(y2) > 0 and hasattr(y2[0], '__len__'):
+            for y2_k in y2:
+                fig.add_trace(x, y2_k, **secondary)
+        else:
+            fig.add_trace(y2, **secondary)
+
+
+def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
+
+    secondary = bool(len(h_ays) > 0)
+    fig = go.Figure() if secondary else psp.make_subplots(
+        specs=[[{"secondary_y": True}]])
+
+    for fn in fns:
+        dct = data[fn]
+        x = dct[h_x]
+        y = [dct[h_y] for h_y in h_ys]
+        y2 = [dct[h_y2] for h_y2 in h_ays] if secondary else None
+
+        multiplot(fig=fig, x=x, y=y, y2=y2)
+
     return fig
+
+
+# def make_fig(h_x, h_ys, h_ays, data, id_range, filt, fns):
+#     # trs = []
+#     # scnds = []
+
+#     fn_ = fns[0]
+#     h_y = h_ys[0]
+
+#     plot_dict = data[fn_]
+#     return px.line(x=plot_dict[h_x], y=plot_dict[h_y])
+
+#     for fn in fns:
+#         cache = plot_dict.get(fn)
+
+#         rng = id_range[fn] if type(
+#             id_range) is dict and id_range.get(fn) else [0, None]
+
+#         trs_fn, seconds_fn = make_fig_traces(
+#             h_x, h_ys, h_ays, cache, rng, filt)
+
+#         trs.extend(trs_fn)
+#         if seconds_fn is not None:
+#             scnds.extend(seconds_fn)
+
+#     if h_ays is not None and len(h_ays) > 0:
+#         fig = psp.make_subplots(specs=[[{"secondary_y": True}]])
+#         fig.add_traces(trs, secondary_ys=scnds)
+#     else:
+#         fig = psp.make_subplots()
+#         fig.add_traces(trs)
+#     return fig
 
 
 def make_fig_traces(h_x, h_ys, h_ays, cache, id_range, filt):
@@ -138,7 +140,7 @@ def make_fig_traces(h_x, h_ys, h_ays, cache, id_range, filt):
     # x = x_c[id_range[0]:id_range[1]]
     ys = [y[id_range[0]:id_range[1]] for y in y_c]
 
-    if h_ays is not None:
+    if h_ays is not None and len(h_ays) > 0:
         alt_y_c = [cache.get(hy) for hy in h_ays]
 
         if filt[0]:
@@ -155,7 +157,7 @@ def make_fig_traces(h_x, h_ys, h_ays, cache, id_range, filt):
         x = x_c[id_range[0]:id_range[1]]
 
     second = None
-    if h_ays is not None:
+    if h_ays is not None and len(h_ays) > 0:
         traces = [go.Scatter(x=x, y=yk, name=hyk)
                   for yk, hyk in zip(ys+alt_ys, h_ys+h_ays)]
         second = tuple(False for k in range(len(ys))) + \
@@ -172,44 +174,6 @@ def filter(series, window):
 
     return sp.ndimage.uniform_filter1d(
         nan_as_zeros, window, mode='constant', cval=0)
-
-
-def get_time(csv):
-
-    headers = csv[0]
-    time_header = 'PerfusionTime' if 'PerfusionTime' in headers else 'CurrentTicks' if 'CurrentTicks' in headers else None
-
-    if time_header == 'PerfusionTime':
-        return process_cols(time_header, csv)
-    if time_header == 'CurrentTicks':
-        ticks, tps = process_cols((time_header, 'TicksPerSecond'), csv)
-        time = [None for k in range(len(ticks))]
-        time[0] = 0
-        for k in range(1, len(ticks)):
-            time[k] = time[k-1] + (ticks[k] - ticks[k-1])*tps[k]*1e-6
-        return time
-    return None
-
-
-def parse_csv(string, lb='\r\n', quote='"', delim=','):
-    # el_start = 0
-    # hold = False
-
-    # rows = [[]]
-    # for k, s in enumerate(string):
-    #     hold = not hold if s == quote else hold
-
-    #     if not hold and s == delim:
-    #         rows[-1].append(string[el_start:k])
-    #         el_start = k+1
-    #     if s == '\r' and string[k:k+2] == lb:
-    #         rows[-1].append(string[el_start:k])
-    #         row_start = k+2
-    #         el_start = k+2
-    #         hold = False
-    #         rows.append([])
-    # return rows
-    return [row for row in csv.reader(io.StringIO(string))]
 
 
 def make_box(hx, hys, fns, cache):

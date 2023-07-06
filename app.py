@@ -37,6 +37,7 @@ app = DashProxy(__name__,
                 prevent_initial_callbacks=True,
                 transforms=[MultiplexerTransform()],
                 external_stylesheets=[dbc.themes.BOOTSTRAP, dbc.icons.BOOTSTRAP])
+application = app.server
 
 store = html.Div([dcc.Store(id='file_memory', data={}),
                   dcc.Store(id='series_cache', data={}),
@@ -178,7 +179,7 @@ app.layout = html.Div([
 ], className='app-cont')
 
 
-@app.callback(Output('series_cache', 'data'), Output('file_memory', 'data'), Output('sidebar', 'is_open'), Output('file_selector', 'options'), Output('file_selector', 'value'), Input('upload-data', 'contents'),
+@app.callback(Output('series_cache', 'data'), Output('sidebar', 'is_open'), Output('file_selector', 'options'), Output('file_selector', 'value'), Input('upload-data', 'contents'),
               State('upload-data', 'filename'), State('file_memory', 'data'), State('series_cache', 'data'), State('file_selector', 'value'))
 def file_ready(list_of_contents, list_of_names, file_mem, cache, fn_select):
     if list_of_contents is None:
@@ -191,21 +192,15 @@ def file_ready(list_of_contents, list_of_names, file_mem, cache, fn_select):
         content_type, content_b64 = contents.split(',')
         content_str = base64.b64decode(content_b64).decode()
 
-        rows = lb.parse_csv(content_str)
-        csv = (rows[0], rows[2:-1])
+        df = pd.read_csv(io.StringIO(content_str))
+        if cache is None:
+            cache = {}
 
-        file_mem = file_mem | {fn: csv}
-
-        time = lb.get_time(csv)
-        new_cache = {fn: {}}
-        if time is not None:
-            csv[0].append('TimeS')
-            new_cache = {fn: {'TimeS': time}}
-        cache = cache | new_cache
+        cache[fn] = df.to_dict(orient='list')
 
     fn_select = list_of_names if fn_select is None else fn_select + list_of_names
 
-    return cache, file_mem, True, list(file_mem.keys()), fn_select
+    return cache, True, list(cache[fn].keys()), fn_select
 
 
 @app.callback(Output('sidebar', 'is_open'), Input('sidebar-open', 'n_clicks'), State('sidebar', 'is_open'))
@@ -213,7 +208,7 @@ def open_sb(n_clicks, open):
     return not open
 
 
-@app.callback(Output('graph', 'figure'), Output('series_cache', 'data'),
+@app.callback(Output('graph', 'figure'),
               Input('update_graph', 'data'),
               State('file_selector', 'value'), State(
                   'series_cache', 'data'), State('file_memory', 'data'),
@@ -224,7 +219,7 @@ def open_sb(n_clicks, open):
               State('x_label', 'value'), State(
                   'y_label', 'value'), State('alt_y_label', 'value'), State('title_in', 'value'),
               State('bool_radio', 'data'))
-def graph_update(_, fns, cache, csv, hx, hy, hay, range, filter_on, filt_window, xlabel, ylabel, altyabel, title, plot_type):
+def graph_update(_, fns, dataframe, csv, hx, hy, hay, range_, filter_on, filt_window, xlabel, ylabel, altyabel, title, plot_type):
 
     if fns is None or len(fns) == 0:
         raise PreventUpdate
@@ -239,7 +234,6 @@ def graph_update(_, fns, cache, csv, hx, hy, hay, range, filter_on, filt_window,
 
     second_axis = bool(hay is not None)
 
-
     hy = (hy,) if isinstance(hy, str) else tuple(
         hy) if isinstance(hy, list) else hy
     hay = (hay,) if isinstance(hay, str) else tuple(
@@ -247,12 +241,12 @@ def graph_update(_, fns, cache, csv, hx, hy, hay, range, filter_on, filt_window,
 
     cols = hy + hay if hx is None else (hx,)+hy+hay
 
-    new_cache = lb.cache_data(cols, cache, csv, fns)
-
+    # new_cache = lb.cache_data(cols, cache, csv, fns)
+    # new_cache = cache
     if plot_type == 'lines_bool':
         filt = (filter_on, filt_window)
 
-        fig = lb.make_fig(hx, hy, hay, new_cache, range, filt, fns)
+        fig = lb.make_fig(hx, hy, hay, dataframe, range_, filt, fns)
     if plot_type == 'spectrum_bool':
         h_st = None
         if len(hy) == 1:
@@ -260,27 +254,29 @@ def graph_update(_, fns, cache, csv, hx, hy, hay, range, filter_on, filt_window,
         elif len(hay) == 1:
             h_st = hay[0]
 
-        fig = lb.make_spectrum(hx, h_st, new_cache, range, fns)
+        fig = lb.make_spectrum(hx, h_st, dataframe, range_, fns)
     if plot_type == 'box_bool':
-        fig = lb.make_box(hx, hy, fns, new_cache)
+        fig = lb.make_box(hx, hy, fns, dataframe)
 
-    fig['layout']['xaxis']['title'] = xlabel
-    fig['layout']['yaxis']['title'] = ylabel
-    if second_axis:
-        fig['layout']['yaxis2']['title'] = altyabel
-    fig['layout']['title'] = title
+    # fig['layout']['xaxis']['title'] = xlabel
+    # fig['layout']['yaxis']['title'] = ylabel
+    # if second_axis:
+    #     fig['layout']['yaxis2']['title'] = altyabel
+    # fig['layout']['title'] = title
+
+    
 
     # , f'{hx} vs. {",".join(hy)}', f'{hx}', f'{",".join(hy)}'
-    return fig, new_cache
+    return fig
 
 
 @ app.callback([Output('header_drop_x', 'options'), Output('header_drop_y', 'options'), Output('header_drop_alty', 'options'), Output('drop_time', 'options'), Output('status_text', 'children')],
-               Input('file_memory', 'data'),
+               Input('series_cache', 'data'),
                State('file_selector', 'value'))
 def update_output(csv, fns):
 
     disp_headers = list(set.intersection(
-        *(set(h for h in csv[fn][0]) for fn in fns)))
+        *(set(h for h in csv[fn].keys()) for fn in fns)))
     # disp_headers = list(headers[0].intersect(*headers))
     return *(disp_headers for k in range(4)), f'file uploaded'
 
@@ -381,4 +377,4 @@ def cb_radio_list(*on):
 
 if __name__ == '__main__':
 
-    app.run_server(debug=True)
+    app.run_server(debug=False)
