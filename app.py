@@ -211,13 +211,15 @@ def graph_update(_, fns, dataframe, csv, col_x, cols_y, cols_y2, range_, filter_
 
     if fns is None or len(fns) == 0:
         raise PreventUpdate
+    
+    if (not cols_y and not cols_y2):
+        raise PreventUpdate
 
     col_x, cols_y, cols_y2 = lb.format_cols(col_x, cols_y, cols_y2)
 
     second_axis = bool(len(cols_y2) > 0)
 
-    if (not cols_y and not cols_y2):
-        raise PreventUpdate
+    
 
     if plot_type == 'lines_bool':
         filt = (filter_on, filt_window)
